@@ -181,14 +181,14 @@
   >
     <template #prepend>
       <!-- Mobile Hamburger Menu -->
-      <v-btn
+      <!-- <v-btn
         v-if="mobile"
         icon
         variant="text"
         @click="mobileDrawer = !mobileDrawer"
       >
         <v-icon icon="mdi-menu" />
-      </v-btn>
+      </v-btn> -->
 
       <!-- Logo and Title -->
       <div class="d-flex align-center">
