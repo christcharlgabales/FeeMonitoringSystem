@@ -1,3 +1,4 @@
+
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useAuthUserStore } from '@/stores/authUser'
@@ -20,6 +21,8 @@ const {
   fetchPaymentHistory,
   addMember: addMemberToDb,
   addPayment: addPaymentToDb,
+  editPayment: editPaymentDb,
+  deletePayment: deletePaymentDb,
   updateMember,
   deleteMember,
   getTotalPaid,
@@ -38,7 +41,10 @@ const showAddMemberDialog = ref(false)
 const showMemberDetailsDialog = ref(false)
 const showPaymentDialog = ref(false)
 const showPaymentHistoryDialog = ref(false)
+const showEditPaymentDialog = ref(false)
+const showDeleteConfirmDialog = ref(false)
 const selectedMember = ref<Member | null>(null)
+const selectedPayment = ref<Payment | null>(null)
 const paymentHistory = ref<Payment[]>([])
 
 // New member form
@@ -55,6 +61,14 @@ const newMember = ref({
 const paymentForm = ref({
   type: 'membership' as 'membership' | 'monthly_dues' | 'daily_dues' | 'cbu',
   amount: 0,
+  notes: ''
+})
+
+// Edit payment form
+const editPaymentForm = ref({
+  type: 'membership' as 'membership' | 'monthly_dues' | 'daily_dues' | 'cbu',
+  amount: 0,
+  payment_date: '',
   notes: ''
 })
 
@@ -140,6 +154,17 @@ const addPayment = async () => {
     return
   }
 
+  // Check if payment exceeds expected amount for membership type
+  if (paymentForm.value.type === 'membership') {
+    const balance = getBalance(selectedMember.value)
+    if (paymentForm.value.amount > balance && balance > 0) {
+      const confirmExceed = confirm(
+        `Warning: Payment amount (${formatCurrency(paymentForm.value.amount)}) exceeds the remaining balance (${formatCurrency(balance)}).\n\nDo you want to continue?`
+      )
+      if (!confirmExceed) return
+    }
+  }
+
   const result = await addPaymentToDb(
     selectedMember.value.id,
     paymentForm.value.amount,
@@ -158,6 +183,64 @@ const openPaymentHistoryDialog = async (member: Member) => {
   if (result.success) {
     paymentHistory.value = result.data
     showPaymentHistoryDialog.value = true
+  }
+}
+
+const openEditPaymentDialog = (payment: Payment) => {
+  selectedPayment.value = payment
+  editPaymentForm.value = {
+    type: payment.payment_type,
+    amount: Number(payment.amount),
+    payment_date: payment.payment_date,
+    notes: payment.notes || ''
+  }
+  showEditPaymentDialog.value = true
+}
+
+const savePaymentEdit = async () => {
+  if (!selectedPayment.value || editPaymentForm.value.amount <= 0) {
+    toast.error('Please enter a valid payment amount')
+    return
+  }
+
+  const result = await editPaymentDb(selectedPayment.value.id, {
+    amount: editPaymentForm.value.amount,
+    payment_type: editPaymentForm.value.type,
+    payment_date: editPaymentForm.value.payment_date,
+    notes: editPaymentForm.value.notes || undefined
+  })
+
+  if (result.success) {
+    showEditPaymentDialog.value = false
+    // Refresh payment history
+    if (selectedMember.value) {
+      const historyResult = await fetchPaymentHistory(selectedMember.value.id)
+      if (historyResult.success) {
+        paymentHistory.value = historyResult.data
+      }
+    }
+  }
+}
+
+const openDeleteConfirmDialog = (payment: Payment) => {
+  selectedPayment.value = payment
+  showDeleteConfirmDialog.value = true
+}
+
+const confirmDeletePayment = async () => {
+  if (!selectedPayment.value) return
+
+  const result = await deletePaymentDb(selectedPayment.value.id)
+
+  if (result.success) {
+    showDeleteConfirmDialog.value = false
+    // Refresh payment history
+    if (selectedMember.value) {
+      const historyResult = await fetchPaymentHistory(selectedMember.value.id)
+      if (historyResult.success) {
+        paymentHistory.value = historyResult.data
+      }
+    }
   }
 }
 
@@ -592,7 +675,7 @@ onMounted(async () => {
         </v-dialog>
 
         <!-- Payment History Dialog -->
-        <v-dialog v-model="showPaymentHistoryDialog" max-width="900px" scrollable>
+        <v-dialog v-model="showPaymentHistoryDialog" max-width="1000px" scrollable>
           <v-card>
             <v-card-title class="d-flex justify-space-between align-center">
               <span class="text-h5">Payment History - {{ selectedMember?.name }}</span>
@@ -612,7 +695,8 @@ onMounted(async () => {
                   { title: 'Payment Date', key: 'payment_date', sortable: true },
                   { title: 'Payment Type', key: 'payment_type', sortable: true },
                   { title: 'Amount', key: 'amount', sortable: true },
-                  { title: 'Notes', key: 'notes', sortable: false }
+                  { title: 'Notes', key: 'notes', sortable: false },
+                  { title: 'Actions', key: 'actions', sortable: false, width: '150' }
                 ]"
                 :items="paymentHistory"
                 item-value="id"
@@ -624,6 +708,9 @@ onMounted(async () => {
                     <div class="font-weight-medium">{{ formatDateTime(item.created_at) }}</div>
                     <div class="text-caption text-medium-emphasis">
                       {{ new Date(item.created_at).toLocaleString('en-PH', { weekday: 'long' }) }}
+                    </div>
+                    <div v-if="item.edited_at" class="text-caption text-warning">
+                      Edited: {{ formatDateTime(item.edited_at) }}
                     </div>
                   </div>
                 </template>
@@ -654,6 +741,25 @@ onMounted(async () => {
 
                 <template v-slot:item.notes="{ item }">
                   <span class="text-caption">{{ item.notes || '—' }}</span>
+                </template>
+
+                <template v-slot:item.actions="{ item }">
+                  <div class="d-flex gap-1">
+                    <v-btn
+                      icon="mdi-pencil"
+                      size="small"
+                      variant="text"
+                      color="primary"
+                      @click="openEditPaymentDialog(item)"
+                    ></v-btn>
+                    <v-btn
+                      icon="mdi-delete"
+                      size="small"
+                      variant="text"
+                      color="error"
+                      @click="openDeleteConfirmDialog(item)"
+                    ></v-btn>
+                  </div>
                 </template>
 
                 <template v-slot:no-data>
@@ -718,6 +824,127 @@ onMounted(async () => {
             </v-card-actions>
           </v-card>
         </v-dialog>
+
+        <!-- Edit Payment Dialog -->
+        <v-dialog v-model="showEditPaymentDialog" max-width="600px">
+          <v-card>
+            <v-card-title>
+              <span class="text-h5">Edit Payment</span>
+            </v-card-title>
+
+            <v-card-text>
+              <v-alert type="warning" variant="tonal" density="compact" class="mb-4">
+                <div class="text-caption">
+                  ⚠️ Editing this payment will recalculate balances and CBU automatically
+                </div>
+              </v-alert>
+
+              <v-form @submit.prevent="savePaymentEdit">
+                <v-select
+                  v-model="editPaymentForm.type"
+                  :items="paymentTypeOptions"
+                  label="Payment Type*"
+                  required
+                  :disabled="loading"
+                ></v-select>
+
+                <v-text-field
+                  v-model.number="editPaymentForm.amount"
+                  label="Payment Amount*"
+                  type="number"
+                  prefix="₱"
+                  required
+                  :disabled="loading"
+                ></v-text-field>
+
+                <v-text-field
+                  v-model="editPaymentForm.payment_date"
+                  label="Payment Date"
+                  type="date"
+                  :disabled="loading"
+                ></v-text-field>
+
+                <v-textarea
+                  v-model="editPaymentForm.notes"
+                  label="Notes (Optional)"
+                  rows="2"
+                  :disabled="loading"
+                ></v-textarea>
+              </v-form>
+            </v-card-text>
+
+            <v-card-actions>
+              <v-spacer></v-spacer>
+              <v-btn 
+                color="grey" 
+                variant="text" 
+                @click="showEditPaymentDialog = false"
+                :disabled="loading"
+              >
+                Cancel
+              </v-btn>
+              <v-btn 
+                color="primary" 
+                variant="elevated" 
+                @click="savePaymentEdit"
+                :loading="loading"
+              >
+                Save Changes
+              </v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-dialog>
+
+        <!-- Delete Confirmation Dialog -->
+        <v-dialog v-model="showDeleteConfirmDialog" max-width="500px">
+          <v-card>
+            <v-card-title class="text-h5">
+              Confirm Delete
+            </v-card-title>
+
+            <v-card-text>
+              <v-alert type="error" variant="tonal" class="mb-4">
+                <div class="text-body-1">
+                  Are you sure you want to delete this payment?
+                </div>
+              </v-alert>
+
+              <div v-if="selectedPayment">
+                <p><strong>Amount:</strong> {{ formatCurrency(selectedPayment.amount) }}</p>
+                <p><strong>Type:</strong> {{ getPaymentTypeLabel(selectedPayment.payment_type) }}</p>
+                <p><strong>Date:</strong> {{ formatDate(selectedPayment.payment_date) }}</p>
+                <p v-if="selectedPayment.notes"><strong>Notes:</strong> {{ selectedPayment.notes }}</p>
+              </div>
+
+              <v-alert type="warning" variant="tonal" density="compact" class="mt-4">
+                <div class="text-caption">
+                  ⚠️ This will automatically adjust balances and CBU. This action cannot be undone.
+                </div>
+              </v-alert>
+            </v-card-text>
+
+            <v-card-actions>
+              <v-spacer></v-spacer>
+              <v-btn 
+                color="grey" 
+                variant="text" 
+                @click="showDeleteConfirmDialog = false"
+                :disabled="loading"
+              >
+                Cancel
+              </v-btn>
+              <v-btn 
+                color="error" 
+                variant="elevated" 
+                @click="confirmDeletePayment"
+                :loading="loading"
+              >
+                Delete Payment
+              </v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-dialog>
+
       </v-container>
     </template>
   </InnerLayoutWrapper>

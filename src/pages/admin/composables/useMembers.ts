@@ -1,3 +1,4 @@
+
 import { ref, computed } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useToast } from 'vue-toastification'
@@ -17,7 +18,9 @@ export interface Payment {
   payment_date: string
   payment_type: 'membership' | 'monthly_dues' | 'daily_dues' | 'cbu'
   notes?: string
-  created_at: string // This is the timestamp when payment was recorded
+  created_at: string
+  edited_at?: string
+  is_deleted?: boolean
 }
 
 export interface Member {
@@ -68,8 +71,9 @@ export const useMembers = () => {
         .select(`
           *,
           membership_type:membership_types(*),
-          payments(*)
+          payments!inner(*)
         `)
+        .eq('payments.is_deleted', false)
         .order('name')
 
       if (error) throw error
@@ -101,6 +105,7 @@ export const useMembers = () => {
         .from('payments')
         .select('*')
         .eq('member_id', memberId)
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -231,6 +236,145 @@ export const useMembers = () => {
     }
   }
 
+  // Edit a payment
+  const editPayment = async (
+    paymentId: string,
+    updates: {
+      amount?: number
+      payment_type?: 'membership' | 'monthly_dues' | 'daily_dues' | 'cbu'
+      payment_date?: string
+      notes?: string
+    }
+  ) => {
+    try {
+      loading.value = true
+
+      // Get the original payment first
+      const { data: originalPayment, error: fetchError } = await supabase
+        .from('payments')
+        .select('*, members!inner(membership_type_id, cbu, membership_types(*))')
+        .eq('id', paymentId)
+        .single()
+
+      if (fetchError) throw fetchError
+
+      const oldAmount = originalPayment.amount
+      const oldType = originalPayment.payment_type
+      const newAmount = updates.amount ?? oldAmount
+      const newType = updates.payment_type ?? oldType
+
+      // Update the payment
+      const { data, error } = await supabase
+        .from('payments')
+        .update({
+          ...updates,
+          edited_at: new Date().toISOString()
+        })
+        .eq('id', paymentId)
+        .select()
+        .single()
+
+      if (error) throw error
+
+      // Handle CBU adjustments if needed
+      const memberData = originalPayment.members
+      
+      if (memberData?.membership_types) {
+        const membershipName = memberData.membership_types.name
+        const shouldAffectCBU = membershipName === 'Tourist VISMIN' || membershipName === 'UVE'
+
+        // Calculate CBU adjustment
+        let cbuAdjustment = 0
+
+        // Remove old CBU contribution
+        if ((oldType === 'monthly_dues' && shouldAffectCBU) || oldType === 'cbu') {
+          cbuAdjustment -= oldAmount
+        }
+
+        // Add new CBU contribution
+        if ((newType === 'monthly_dues' && shouldAffectCBU) || newType === 'cbu') {
+          cbuAdjustment += newAmount
+        }
+
+        // Update member's CBU if there's a change
+        if (cbuAdjustment !== 0) {
+          const currentCBU = memberData.cbu || 0
+          const { error: updateError } = await supabase
+            .from('members')
+            .update({ cbu: currentCBU + cbuAdjustment })
+            .eq('id', originalPayment.member_id)
+
+          if (updateError) throw updateError
+        }
+      }
+
+      toast.success('Payment updated successfully')
+      await fetchMembers()
+      return { success: true, data }
+    } catch (error: any) {
+      toast.error('Failed to update payment: ' + error.message)
+      console.error('Error updating payment:', error)
+      return { success: false, error }
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // Delete a payment (soft delete)
+  const deletePayment = async (paymentId: string) => {
+    try {
+      loading.value = true
+
+      // Get the payment first to adjust CBU if needed
+      const { data: payment, error: fetchError } = await supabase
+        .from('payments')
+        .select('*, members!inner(membership_type_id, cbu, membership_types(*))')
+        .eq('id', paymentId)
+        .single()
+
+      if (fetchError) throw fetchError
+
+      // Mark as deleted (soft delete)
+      const { error } = await supabase
+        .from('payments')
+        .update({
+          is_deleted: true,
+          deleted_at: new Date().toISOString()
+        })
+        .eq('id', paymentId)
+
+      if (error) throw error
+
+      // Adjust CBU if this was a CBU-related payment
+      const memberData = payment.members
+      
+      if (memberData?.membership_types) {
+        const membershipName = memberData.membership_types.name
+        const shouldAffectCBU = membershipName === 'Tourist VISMIN' || membershipName === 'UVE'
+
+        if ((payment.payment_type === 'monthly_dues' && shouldAffectCBU) || payment.payment_type === 'cbu') {
+          const currentCBU = memberData.cbu || 0
+          const { error: updateError } = await supabase
+            .from('members')
+            .update({ cbu: Math.max(0, currentCBU - payment.amount) })
+            .eq('id', payment.member_id)
+
+          if (updateError) throw updateError
+        }
+      }
+
+      toast.success('Payment deleted successfully')
+      await fetchMembers()
+      return { success: true }
+    } catch (error: any) {
+      toast.error('Failed to delete payment: ' + error.message)
+      console.error('Error deleting payment:', error)
+      return { success: false, error }
+    } finally {
+      loading.value = false
+    }
+  }
+
   // Update member details
   const updateMember = async (memberId: string, updates: Partial<Member>) => {
     try {
@@ -322,7 +466,7 @@ export const useMembers = () => {
       const percentage = requiredFee > 0 ? (totalPaid / requiredFee) * 100 : 0
       return {
         status: 'Partial',
-        color: 'warning',
+        color: 'info',
         percentage: Math.round(percentage)
       }
     }
@@ -363,6 +507,8 @@ export const useMembers = () => {
     fetchPaymentHistory,
     addMember,
     addPayment,
+    editPayment,
+    deletePayment,
     updateMember,
     deleteMember,
     getTotalPaid,
