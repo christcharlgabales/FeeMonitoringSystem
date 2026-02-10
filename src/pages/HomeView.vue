@@ -37,7 +37,6 @@ const selectedMember = ref<Member | null>(null)
 // New member form
 const newMember = ref({
   name: '',
-  membership_type_id: '',
   initial_payment: 0,
   cbu: 0,
   management_fee: 0,
@@ -68,7 +67,6 @@ const selectMembershipType = (type: MembershipType) => {
 const openAddMemberDialog = () => {
   newMember.value = {
     name: '',
-    membership_type_id: selectedMembershipType.value?.id || '',
     initial_payment: 0,
     cbu: 0,
     management_fee: 0,
@@ -79,14 +77,14 @@ const openAddMemberDialog = () => {
 }
 
 const addMember = async () => {
-  if (!newMember.value.name || !newMember.value.membership_type_id) {
-    toast.error('Please fill in all required fields')
+  if (!newMember.value.name || !selectedMembershipType.value) {
+    toast.error('Please fill in the member name')
     return
   }
 
   const result = await addMemberToDb({
     name: newMember.value.name,
-    membership_type_id: newMember.value.membership_type_id,
+    membership_type_id: selectedMembershipType.value.id, // Use the selected membership type
     initial_payment: newMember.value.initial_payment,
     cbu: newMember.value.cbu,
     management_fee: newMember.value.management_fee,
@@ -313,10 +311,22 @@ onMounted(async () => {
         <v-dialog v-model="showAddMemberDialog" max-width="600px">
           <v-card>
             <v-card-title>
-              <span class="text-h5">Add New Member</span>
+              <span class="text-h5">Add New Member - {{ selectedMembershipType?.name }}</span>
             </v-card-title>
 
             <v-card-text>
+              <!-- Display selected membership type info -->
+              <v-alert 
+                type="info" 
+                variant="tonal" 
+                class="mb-4"
+              >
+                <div class="d-flex justify-space-between align-center">
+                  <span>Membership Type: <strong>{{ selectedMembershipType?.name }}</strong></span>
+                  <span>Fee: <strong>{{ formatCurrency(selectedMembershipType?.fee || 0) }}</strong></span>
+                </div>
+              </v-alert>
+
               <v-form @submit.prevent="addMember">
                 <v-text-field
                   v-model="newMember.name"
@@ -324,16 +334,6 @@ onMounted(async () => {
                   required
                   :disabled="loading"
                 ></v-text-field>
-
-                <v-select
-                  v-model="newMember.membership_type_id"
-                  :items="membershipTypes"
-                  item-title="name"
-                  item-value="id"
-                  label="Membership Type*"
-                  required
-                  :disabled="loading"
-                ></v-select>
 
                 <v-text-field
                   v-model.number="newMember.initial_payment"
