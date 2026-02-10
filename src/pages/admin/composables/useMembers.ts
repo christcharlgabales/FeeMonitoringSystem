@@ -7,6 +7,7 @@ export interface MembershipType {
   name: string
   fee: number
   color: string
+  cbu_target: number
 }
 
 export interface Payment {
@@ -14,6 +15,7 @@ export interface Payment {
   member_id: string
   amount: number
   payment_date: string
+  payment_type: 'membership' | 'monthly_dues' | 'daily_dues' | 'cbu'
   notes?: string
 }
 
@@ -115,6 +117,7 @@ export const useMembers = () => {
           .insert({
             member_id: member.id,
             amount: memberData.initial_payment,
+            payment_type: 'membership',
             notes: 'Initial payment'
           })
 
@@ -134,25 +137,60 @@ export const useMembers = () => {
   }
 
   // Add payment to a member
-  const addPayment = async (memberId: string, amount: number, notes?: string) => {
+  const addPayment = async (
+    memberId: string, 
+    amount: number, 
+    paymentType: 'membership' | 'monthly_dues' | 'daily_dues' | 'cbu' = 'membership',
+    notes?: string
+  ) => {
     try {
       loading.value = true
 
-      const { data, error } = await supabase
+      // Find the member to check membership type
+      const member = members.value.find(m => m.id === memberId)
+      
+      // Insert payment
+      const { data: payment, error: paymentError } = await supabase
         .from('payments')
         .insert({
           member_id: memberId,
           amount,
+          payment_type: paymentType,
           notes
         })
         .select()
         .single()
 
-      if (error) throw error
+      if (paymentError) throw paymentError
+
+      // If it's monthly_dues payment for Tourist VISMIN or UVE, also add to CBU
+      if (paymentType === 'monthly_dues' && member?.membership_type) {
+        if (member.membership_type.name === 'Tourist VISMIN' || member.membership_type.name === 'UVE') {
+          // Update the member's CBU
+          const currentCBU = member.cbu || 0
+          const { error: updateError } = await supabase
+            .from('members')
+            .update({ cbu: currentCBU + amount })
+            .eq('id', memberId)
+
+          if (updateError) throw updateError
+        }
+      }
+
+      // If it's a direct CBU payment, update the member's CBU
+      if (paymentType === 'cbu') {
+        const currentCBU = member?.cbu || 0
+        const { error: updateError } = await supabase
+          .from('members')
+          .update({ cbu: currentCBU + amount })
+          .eq('id', memberId)
+
+        if (updateError) throw updateError
+      }
 
       toast.success('Payment recorded successfully')
       await fetchMembers() // Refresh the list
-      return { success: true, data }
+      return { success: true, data: payment }
     } catch (error: any) {
       toast.error('Failed to record payment: ' + error.message)
       console.error('Error adding payment:', error)
@@ -213,8 +251,13 @@ export const useMembers = () => {
   }
 
   // Helper functions
-  const getTotalPaid = (member: Member): number => {
+  const getTotalPaid = (member: Member, paymentType?: string): number => {
     if (!member.payments) return 0
+    if (paymentType) {
+      return member.payments
+        .filter(p => p.payment_type === paymentType)
+        .reduce((sum, payment) => sum + Number(payment.amount), 0)
+    }
     return member.payments.reduce((sum, payment) => sum + Number(payment.amount), 0)
   }
 
@@ -222,14 +265,24 @@ export const useMembers = () => {
     return member.membership_type ? Number(member.membership_type.fee) : 0
   }
 
+  const getCBUTarget = (member: Member): number => {
+    return member.membership_type ? Number(member.membership_type.cbu_target) : 0
+  }
+
+  const getCBUBalance = (member: Member): number => {
+    const target = getCBUTarget(member)
+    const current = Number(member.cbu) || 0
+    return Math.max(0, target - current)
+  }
+
   const getBalance = (member: Member): number => {
-    const totalPaid = getTotalPaid(member)
+    const totalPaid = getTotalPaid(member, 'membership')
     const requiredFee = getMembershipFee(member)
     return Math.max(0, requiredFee - totalPaid)
   }
 
   const getPaymentStatus = (member: Member) => {
-    const totalPaid = getTotalPaid(member)
+    const totalPaid = getTotalPaid(member, 'membership')
     const requiredFee = getMembershipFee(member)
 
     if (totalPaid >= requiredFee) {
@@ -239,6 +292,22 @@ export const useMembers = () => {
       return {
         status: 'Partial',
         color: 'warning',
+        percentage: Math.round(percentage)
+      }
+    }
+  }
+
+  const getCBUStatus = (member: Member) => {
+    const current = Number(member.cbu) || 0
+    const target = getCBUTarget(member)
+
+    if (current >= target) {
+      return { status: 'Complete', color: 'success', percentage: 100 }
+    } else {
+      const percentage = target > 0 ? (current / target) * 100 : 0
+      return {
+        status: 'In Progress',
+        color: 'info',
         percentage: Math.round(percentage)
       }
     }
@@ -256,7 +325,10 @@ export const useMembers = () => {
     deleteMember,
     getTotalPaid,
     getMembershipFee,
+    getCBUTarget,
+    getCBUBalance,
     getBalance,
-    getPaymentStatus
+    getPaymentStatus,
+    getCBUStatus
   }
 }

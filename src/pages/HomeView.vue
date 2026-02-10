@@ -23,8 +23,11 @@ const {
   deleteMember,
   getTotalPaid,
   getMembershipFee,
+  getCBUTarget,
+  getCBUBalance,
   getBalance,
-  getPaymentStatus
+  getPaymentStatus,
+  getCBUStatus
 } = useMembers()
 
 // State
@@ -45,8 +48,11 @@ const newMember = ref({
 })
 
 // Payment form
-const newPaymentAmount = ref(0)
-const paymentNotes = ref('')
+const paymentForm = ref({
+  type: 'membership' as 'membership' | 'monthly_dues' | 'daily_dues' | 'cbu',
+  amount: 0,
+  notes: ''
+})
 
 // Computed properties
 const filteredMembers = computed(() => {
@@ -57,6 +63,23 @@ const filteredMembers = computed(() => {
 const memberCount = (typeId: string) => {
   return members.value.filter(m => m.membership_type_id === typeId).length
 }
+
+const paymentTypeOptions = computed(() => {
+  const options = [
+    { title: 'Membership Fee', value: 'membership' },
+    { title: 'Monthly Dues', value: 'monthly_dues' },
+    { title: 'Daily Dues', value: 'daily_dues' },
+    { title: 'CBU (Capital Build Up)', value: 'cbu' }
+  ]
+  return options
+})
+
+const showCBUNote = computed(() => {
+  if (!selectedMember.value?.membership_type) return false
+  const membershipName = selectedMember.value.membership_type.name
+  return paymentForm.value.type === 'monthly_dues' && 
+         (membershipName === 'Tourist VISMIN' || membershipName === 'UVE')
+})
 
 // Methods
 const selectMembershipType = (type: MembershipType) => {
@@ -84,7 +107,7 @@ const addMember = async () => {
 
   const result = await addMemberToDb({
     name: newMember.value.name,
-    membership_type_id: selectedMembershipType.value.id, // Use the selected membership type
+    membership_type_id: selectedMembershipType.value.id,
     initial_payment: newMember.value.initial_payment,
     cbu: newMember.value.cbu,
     management_fee: newMember.value.management_fee,
@@ -99,21 +122,25 @@ const addMember = async () => {
 
 const openPaymentDialog = (member: Member) => {
   selectedMember.value = member
-  newPaymentAmount.value = 0
-  paymentNotes.value = ''
+  paymentForm.value = {
+    type: 'membership',
+    amount: 0,
+    notes: ''
+  }
   showPaymentDialog.value = true
 }
 
 const addPayment = async () => {
-  if (!selectedMember.value || newPaymentAmount.value <= 0) {
+  if (!selectedMember.value || paymentForm.value.amount <= 0) {
     toast.error('Please enter a valid payment amount')
     return
   }
 
   const result = await addPaymentToDb(
     selectedMember.value.id,
-    newPaymentAmount.value,
-    paymentNotes.value || undefined
+    paymentForm.value.amount,
+    paymentForm.value.type,
+    paymentForm.value.notes || undefined
   )
 
   if (result.success) {
@@ -188,9 +215,12 @@ onMounted(async () => {
                 {{ formatCurrency(type.fee) }}
               </v-card-subtitle>
               <v-card-text>
-                <div class="d-flex align-center justify-space-between">
+                <div class="d-flex align-center justify-space-between mb-2">
                   <span>Members: {{ memberCount(type.id) }}</span>
                   <v-icon>mdi-arrow-right</v-icon>
+                </div>
+                <div class="text-caption">
+                  CBU Target: {{ formatCurrency(type.cbu_target) }}
                 </div>
               </v-card-text>
             </v-card>
@@ -198,7 +228,7 @@ onMounted(async () => {
         </v-row>
 
         <!-- Member Details Dialog -->
-        <v-dialog v-model="showMemberDetailsDialog" max-width="1400px" scrollable>
+        <v-dialog v-model="showMemberDetailsDialog" max-width="1600px" scrollable>
           <v-card>
             <v-card-title class="d-flex justify-space-between align-center">
               <span class="text-h5">{{ selectedMembershipType?.name }} Members</span>
@@ -229,7 +259,7 @@ onMounted(async () => {
                   { title: 'Membership Fee', key: 'membership', sortable: false },
                   { title: 'Payment Status', key: 'status', sortable: false },
                   { title: 'Balance', key: 'balance', sortable: false },
-                  { title: 'CBU', key: 'cbu', sortable: true },
+                  { title: 'CBU Progress', key: 'cbu_progress', sortable: false },
                   { title: 'Management Fee', key: 'management_fee', sortable: true },
                   { title: 'Monthly Dues', key: 'monthly_dues', sortable: true },
                   { title: 'Daily Dues', key: 'daily_dues', sortable: true },
@@ -242,7 +272,7 @@ onMounted(async () => {
               >
                 <template v-slot:item.membership="{ item }">
                   <div>
-                    <div>{{ formatCurrency(getTotalPaid(item)) }} / {{ formatCurrency(getMembershipFee(item)) }}</div>
+                    <div>{{ formatCurrency(getTotalPaid(item, 'membership')) }} / {{ formatCurrency(getMembershipFee(item)) }}</div>
                     <v-progress-linear
                       :model-value="getPaymentStatus(item).percentage"
                       :color="getPaymentStatus(item).color"
@@ -267,8 +297,16 @@ onMounted(async () => {
                   </span>
                 </template>
 
-                <template v-slot:item.cbu="{ item }">
-                  {{ formatCurrency(item.cbu) }}
+                <template v-slot:item.cbu_progress="{ item }">
+                  <div>
+                    <div class="text-caption">{{ formatCurrency(item.cbu) }} / {{ formatCurrency(getCBUTarget(item)) }}</div>
+                    <v-progress-linear
+                      :model-value="getCBUStatus(item).percentage"
+                      :color="getCBUStatus(item).color"
+                      height="6"
+                      class="mt-1"
+                    ></v-progress-linear>
+                  </div>
                 </template>
 
                 <template v-slot:item.management_fee="{ item }">
@@ -285,7 +323,6 @@ onMounted(async () => {
 
                 <template v-slot:item.actions="{ item }">
                   <v-btn
-                    v-if="getBalance(item) > 0"
                     color="primary"
                     size="small"
                     variant="tonal"
@@ -293,7 +330,6 @@ onMounted(async () => {
                   >
                     Add Payment
                   </v-btn>
-                  <v-chip v-else color="success" size="small">Paid in Full</v-chip>
                 </template>
 
                 <template v-slot:no-data>
@@ -325,6 +361,9 @@ onMounted(async () => {
                   <span>Membership Type: <strong>{{ selectedMembershipType?.name }}</strong></span>
                   <span>Fee: <strong>{{ formatCurrency(selectedMembershipType?.fee || 0) }}</strong></span>
                 </div>
+                <div class="text-caption mt-1">
+                  CBU Target: {{ formatCurrency(selectedMembershipType?.cbu_target || 0) }}
+                </div>
               </v-alert>
 
               <v-form @submit.prevent="addMember">
@@ -337,7 +376,7 @@ onMounted(async () => {
 
                 <v-text-field
                   v-model.number="newMember.initial_payment"
-                  label="Initial Payment"
+                  label="Initial Payment (Membership Fee)"
                   type="number"
                   prefix="₱"
                   hint="Leave as 0 if no initial payment"
@@ -348,10 +387,11 @@ onMounted(async () => {
 
                 <v-text-field
                   v-model.number="newMember.cbu"
-                  label="Capital Build Up (CBU)"
+                  label="Initial CBU (Capital Build Up)"
                   type="number"
                   prefix="₱"
                   :disabled="loading"
+                  hint="Optional starting CBU amount"
                 ></v-text-field>
 
                 <v-text-field
@@ -403,23 +443,73 @@ onMounted(async () => {
         </v-dialog>
 
         <!-- Add Payment Dialog -->
-        <v-dialog v-model="showPaymentDialog" max-width="500px">
+        <v-dialog v-model="showPaymentDialog" max-width="600px">
           <v-card>
             <v-card-title>
               <span class="text-h5">Add Payment</span>
             </v-card-title>
 
             <v-card-text v-if="selectedMember">
-              <p><strong>Member:</strong> {{ selectedMember.name }}</p>
-              <p><strong>Membership Type:</strong> {{ selectedMember.membership_type?.name }}</p>
-              <p><strong>Total Paid:</strong> {{ formatCurrency(getTotalPaid(selectedMember)) }}</p>
-              <p><strong>Balance:</strong> {{ formatCurrency(getBalance(selectedMember)) }}</p>
+              <!-- Member Info -->
+              <v-card variant="outlined" class="mb-4">
+                <v-card-text>
+                  <div class="mb-2"><strong>Member:</strong> {{ selectedMember.name }}</div>
+                  <div class="mb-2"><strong>Membership Type:</strong> {{ selectedMember.membership_type?.name }}</div>
+                  
+                  <v-divider class="my-3"></v-divider>
+                  
+                  <!-- Payment Summary -->
+                  <div class="text-subtitle-2 mb-2">Payment Summary:</div>
+                  <div class="d-flex justify-space-between mb-1">
+                    <span>Membership Fee Paid:</span>
+                    <strong>{{ formatCurrency(getTotalPaid(selectedMember, 'membership')) }} / {{ formatCurrency(getMembershipFee(selectedMember)) }}</strong>
+                  </div>
+                  <div class="d-flex justify-space-between mb-1">
+                    <span>Membership Balance:</span>
+                    <strong :class="getBalance(selectedMember) > 0 ? 'text-error' : 'text-success'">
+                      {{ formatCurrency(getBalance(selectedMember)) }}
+                    </strong>
+                  </div>
+                  
+                  <v-divider class="my-3"></v-divider>
+                  
+                  <div class="d-flex justify-space-between mb-1">
+                    <span>CBU Progress:</span>
+                    <strong>{{ formatCurrency(selectedMember.cbu) }} / {{ formatCurrency(getCBUTarget(selectedMember)) }}</strong>
+                  </div>
+                  <div class="d-flex justify-space-between">
+                    <span>CBU Balance:</span>
+                    <strong :class="getCBUBalance(selectedMember) > 0 ? 'text-warning' : 'text-success'">
+                      {{ formatCurrency(getCBUBalance(selectedMember)) }}
+                    </strong>
+                  </div>
+                </v-card-text>
+              </v-card>
 
-              <v-divider class="my-4"></v-divider>
-
+              <!-- Payment Form -->
               <v-form @submit.prevent="addPayment">
+                <v-select
+                  v-model="paymentForm.type"
+                  :items="paymentTypeOptions"
+                  label="Payment Type*"
+                  required
+                  :disabled="loading"
+                ></v-select>
+
+                <v-alert
+                  v-if="showCBUNote"
+                  type="info"
+                  variant="tonal"
+                  density="compact"
+                  class="mb-4"
+                >
+                  <div class="text-caption">
+                    💡 Monthly Dues for {{ selectedMember.membership_type?.name }} will automatically be added to CBU
+                  </div>
+                </v-alert>
+
                 <v-text-field
-                  v-model.number="newPaymentAmount"
+                  v-model.number="paymentForm.amount"
                   label="Payment Amount*"
                   type="number"
                   prefix="₱"
@@ -428,7 +518,7 @@ onMounted(async () => {
                 ></v-text-field>
 
                 <v-textarea
-                  v-model="paymentNotes"
+                  v-model="paymentForm.notes"
                   label="Notes (Optional)"
                   rows="2"
                   :disabled="loading"
