@@ -1,0 +1,169 @@
+{
+  "title": "Monitoring Fee Management System",
+  "description": "A comprehensive solution for monitoring and managing fees across departments, ensuring accurate and timely fee collection and tracking.",
+  "subtitle": "Streamlining Fee Collection and Monitoring Across Teams",
+  "backgroundImage": {
+    "src": "/images/monitoring-bg.png",
+    "alt": "Professional background with graphs and financial data",
+    "overlay": {
+      "enabled": true,
+      "color": "rgba(0, 123, 255, 0.15)",
+      "opacity": 0.8
+    }
+  },
+  "features": [
+    {
+      "title": "Fee Tracking Dashboard",
+      "description": "Provides a centralized view of all fees, payment statuses, and outstanding balances in real-time.",
+      "icon": "mdi-monitor-dashboard"
+    },
+    {
+      "title": "Automated Fee Calculation",
+      "description": "Automatically calculates fees based on predefined rules, ensuring accurate and up-to-date billing.",
+      "icon": "mdi-calculator"
+    },
+    {
+      "title": "Payment Integration",
+      "description": "Supports multiple payment methods for easy fee collection, including online payments and cash receipts.",
+      "icon": "mdi-credit-card"
+    },
+    {
+      "title": "Detailed Reporting",
+      "description": "Generates detailed reports on fee collections, outstanding payments, and departmental financial summaries.",
+      "icon": "mdi-file-chart"
+    }
+  ],
+  "version": "1.0.0",
+  "author": "Monitoring Fee Project Development Team",
+  "lastUpdated": "2025-10-17",
+  "theme": {
+    "primaryColor": "#8B4513",
+    "secondaryColor": "#F4E4BC"
+  },
+  "ui": {
+    "showNavbar": true,
+    "showFooter": true,
+    "_comment": "Select the navbar component to use: 1, 2, 3, or 4",
+    "navbarComponent": "1",
+    "_footerComment": "Select the footer component to use: 1 or 2",
+    "footerComponent": "1",
+    "navbar": {
+      "title": "Monitoring Fee System",
+      "icon": "mdi-account-cash",
+      "logo": {
+        "src": "/src/assets/logo.svg",
+        "alt": "Monitoring Fee Logo",
+        "width": 32,
+        "height": 32
+      },
+      "color": "primary",
+      "elevation": 2,
+      "density": "comfortable",
+      "navigationItems": [
+        {
+          "_comment": "dont change this",
+          "label": "Features",
+          "action": "scroll",
+          "target": "features"
+        },
+        {
+          "_comment": "dont change this",
+          "label": "About",
+          "action": "scroll",
+          "target": "about"
+        }
+      ],
+      "ctaButton": {
+        "label": "Get Started",
+        "variant": "outlined",
+        "color": "on-primary",
+        "action": "navigate",
+        "_comment": "dont change this /auth cause it is linked to the auth page",
+        "target": "/auth"
+      }
+    },
+    "footer": {
+      "companyName": "Monitoring Fee System",
+      "tagline": "Ensuring accurate fee management and tracking",
+      "icon": "mdi-cash-multiple",
+      "color": "grey-darken-3",
+      "copyright": "Monitoring Fee Project Team. All rights reserved.",
+      "socialLinks": [
+        {
+          "platform": "github",
+          "icon": "mdi-github",
+          "url": "https://github.com",
+          "label": "GitHub"
+        },
+        {
+          "platform": "twitter",
+          "icon": "mdi-twitter",
+          "url": "https://twitter.com",
+          "label": "Twitter"
+        },
+        {
+          "platform": "linkedin",
+          "icon": "mdi-linkedin",
+          "url": "https://linkedin.com",
+          "label": "LinkedIn"
+        }
+      ],
+      "technologies": [
+        {
+          "name": "Fee Management",
+          "icon": "mdi-cash-register",
+          "color": "blue"
+        },
+        {
+          "name": "Payment Integration",
+          "icon": "mdi-credit-card",
+          "color": "green"
+        }
+      ],
+      "thesisTeam": {
+        "enabled": true,
+        "title": "Development Team",
+        "subtitle": "Meet the experts behind your fee management system",
+        "members": [
+          {
+            "name": "Lead Developer",
+            "role": "System Architect",
+            "avatar": "/images/team/lead-dev.jpg"
+          },
+          {
+            "name": "UX Designer",
+            "role": "User Experience Specialist",
+            "avatar": "/images/team/ux-designer.jpg"
+          },
+          {
+            "name": "Payment Integration Specialist",
+            "role": "Payment Systems Expert",
+            "avatar": "/images/team/payment-specialist.jpg"
+          }
+        ]
+      }
+    }
+  },
+  "authPage": {
+    "title": "Welcome to Monitoring Fee System",
+    "subtitle": "Access your fee management workspace",
+    "layout": {
+      "quotePosition": "right"
+    },
+    "quote": {
+      "text": "Efficiency is doing things right; effectiveness is doing the right things.",
+      "author": "Peter Drucker",
+      "source": "Management Expert",
+      "motivationalText": "Start managing fees efficiently with smart technology."
+    },
+    "backgroundImage": {
+      "src": "/images/auth-background.jpg",
+      "alt": "Modern office space with fee management charts",
+      "overlay": {
+        "enabled": true,
+        "color": "rgba(0, 123, 255, 0.1)",
+        "opacity": 0.9
+      }
+    }
+  }
+}
