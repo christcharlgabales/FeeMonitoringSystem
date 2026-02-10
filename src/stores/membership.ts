@@ -178,54 +178,60 @@ export const useMembershipStore = defineStore('membership', () => {
   }
 
   async function addPayment(
-    memberId: string,
-    amount: number,
-    paymentType: 'membership' | 'monthly_dues' | 'daily_dues' | 'cbu' = 'membership',
-    notes?: string
-  ) {
-    try {
-      loading.value = true
+  memberId: string,
+  amount: number,
+  paymentType: 'membership' | 'monthly_dues' | 'daily_dues' | 'cbu' = 'membership',
+  notes?: string
+) {
+  try {
+    loading.value = true
 
-      const member = members.value.find(m => m.id === memberId)
+    const member = members.value.find(m => m.id === memberId)
 
-      const { data: payment, error: paymentError } = await supabase
-        .from('payments')
-        .insert({
-          member_id: memberId,
-          amount,
-          payment_type: paymentType,
-          notes
-        })
-        .select()
-        .single()
+    // Insert payment
+    const { data: payment, error: paymentError } = await supabase
+      .from('payments')
+      .insert({
+        member_id: memberId,
+        amount,
+        payment_type: paymentType,
+        notes
+      })
+      .select()
+      .single()
 
-      if (paymentError) throw paymentError
+    if (paymentError) throw paymentError
 
-      if (member?.membership_type) {
-        const shouldAffectCBU = member.membership_type.name === 'Tourist VISMIN' || member.membership_type.name === 'UVE'
+    // Handle CBU updates
+    if (member?.membership_type) {
+      const membershipName = member.membership_type.name
+      const shouldAffectCBU = membershipName === 'Tourist VISMIN' || membershipName === 'UVE'
 
-        if ((paymentType === 'monthly_dues' && shouldAffectCBU) || paymentType === 'cbu') {
-          const currentCBU = member.cbu || 0
-          const { error: updateError } = await supabase
-            .from('members')
-            .update({ cbu: currentCBU + amount })
-            .eq('id', memberId)
+      // ONLY update CBU if:
+      // 1. Payment type is 'cbu' (direct CBU payment), OR
+      // 2. Payment type is 'monthly_dues' AND member is Tourist VISMIN or UVE
+      if (paymentType === 'cbu' || (paymentType === 'monthly_dues' && shouldAffectCBU)) {
+        const currentCBU = member.cbu || 0
+        const { error: updateError } = await supabase
+          .from('members')
+          .update({ cbu: currentCBU + amount })
+          .eq('id', memberId)
 
-          if (updateError) throw updateError
-        }
+        if (updateError) throw updateError
       }
-
-      toast.success('Payment recorded successfully')
-      await fetchMembers()
-      return { success: true, data: payment }
-    } catch (error: any) {
-      toast.error('Failed to record payment: ' + error.message)
-      console.error('Error adding payment:', error)
-      return { success: false, error }
-    } finally {
-      loading.value = false
     }
+
+    toast.success('Payment recorded successfully')
+    await fetchMembers() // Refresh the list
+    return { success: true, data: payment }
+  } catch (error: any) {
+    toast.error('Failed to record payment: ' + error.message)
+    console.error('Error adding payment:', error)
+    return { success: false, error }
+  } finally {
+    loading.value = false
   }
+}
 
   // Actions - Update
   async function editPayment(
