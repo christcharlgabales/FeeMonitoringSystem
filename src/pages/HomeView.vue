@@ -4,7 +4,7 @@ import { useAuthUserStore } from '@/stores/authUser'
 import { useToast } from 'vue-toastification'
 import { storeToRefs } from 'pinia'
 import InnerLayoutWrapper from '@/layouts/InnerLayoutWrapper.vue'
-import { useMembers, type Member, type MembershipType } from '@/pages/admin/composables/useMembers'
+import { useMembers, type Member, type MembershipType, type Payment } from '@/pages/admin/composables/useMembers'
 
 const authStore = useAuthUserStore()
 const toast = useToast()
@@ -17,6 +17,7 @@ const {
   loading,
   fetchMembershipTypes,
   fetchMembers,
+  fetchPaymentHistory,
   addMember: addMemberToDb,
   addPayment: addPaymentToDb,
   updateMember,
@@ -27,7 +28,8 @@ const {
   getCBUBalance,
   getBalance,
   getPaymentStatus,
-  getCBUStatus
+  getCBUStatus,
+  getPaymentTypeLabel
 } = useMembers()
 
 // State
@@ -35,7 +37,9 @@ const selectedMembershipType = ref<MembershipType | null>(null)
 const showAddMemberDialog = ref(false)
 const showMemberDetailsDialog = ref(false)
 const showPaymentDialog = ref(false)
+const showPaymentHistoryDialog = ref(false)
 const selectedMember = ref<Member | null>(null)
+const paymentHistory = ref<Payment[]>([])
 
 // New member form
 const newMember = ref({
@@ -148,6 +152,15 @@ const addPayment = async () => {
   }
 }
 
+const openPaymentHistoryDialog = async (member: Member) => {
+  selectedMember.value = member
+  const result = await fetchPaymentHistory(member.id)
+  if (result.success) {
+    paymentHistory.value = result.data
+    showPaymentHistoryDialog.value = true
+  }
+}
+
 const handleLogout = async () => {
   try {
     const result = await authStore.signOut()
@@ -167,6 +180,25 @@ const formatCurrency = (amount: number) => {
     style: 'currency',
     currency: 'PHP'
   }).format(amount)
+}
+
+const formatDateTime = (dateString: string) => {
+  return new Intl.DateTimeFormat('en-PH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  }).format(new Date(dateString))
+}
+
+const formatDate = (dateString: string) => {
+  return new Intl.DateTimeFormat('en-PH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  }).format(new Date(dateString))
 }
 
 // Load data on mount
@@ -322,14 +354,25 @@ onMounted(async () => {
                 </template>
 
                 <template v-slot:item.actions="{ item }">
-                  <v-btn
-                    color="primary"
-                    size="small"
-                    variant="tonal"
-                    @click="openPaymentDialog(item)"
-                  >
-                    Add Payment
-                  </v-btn>
+                  <div class="d-flex gap-2">
+                    <v-btn
+                      color="primary"
+                      size="small"
+                      variant="tonal"
+                      @click="openPaymentDialog(item)"
+                    >
+                      Add Payment
+                    </v-btn>
+                    <v-btn
+                      color="info"
+                      size="small"
+                      variant="outlined"
+                      @click="openPaymentHistoryDialog(item)"
+                      prepend-icon="mdi-history"
+                    >
+                      History
+                    </v-btn>
+                  </div>
                 </template>
 
                 <template v-slot:no-data>
@@ -543,6 +586,134 @@ onMounted(async () => {
                 :loading="loading"
               >
                 Record Payment
+              </v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-dialog>
+
+        <!-- Payment History Dialog -->
+        <v-dialog v-model="showPaymentHistoryDialog" max-width="900px" scrollable>
+          <v-card>
+            <v-card-title class="d-flex justify-space-between align-center">
+              <span class="text-h5">Payment History - {{ selectedMember?.name }}</span>
+              <v-btn 
+                icon="mdi-close" 
+                variant="text"
+                @click="showPaymentHistoryDialog = false"
+              ></v-btn>
+            </v-card-title>
+
+            <v-divider></v-divider>
+
+            <v-card-text style="max-height: 500px;">
+              <v-data-table
+                :headers="[
+                  { title: 'Date & Time Recorded', key: 'created_at', sortable: true },
+                  { title: 'Payment Date', key: 'payment_date', sortable: true },
+                  { title: 'Payment Type', key: 'payment_type', sortable: true },
+                  { title: 'Amount', key: 'amount', sortable: true },
+                  { title: 'Notes', key: 'notes', sortable: false }
+                ]"
+                :items="paymentHistory"
+                item-value="id"
+                class="elevation-0"
+                density="comfortable"
+              >
+                <template v-slot:item.created_at="{ item }">
+                  <div>
+                    <div class="font-weight-medium">{{ formatDateTime(item.created_at) }}</div>
+                    <div class="text-caption text-medium-emphasis">
+                      {{ new Date(item.created_at).toLocaleString('en-PH', { weekday: 'long' }) }}
+                    </div>
+                  </div>
+                </template>
+
+                <template v-slot:item.payment_date="{ item }">
+                  {{ formatDate(item.payment_date) }}
+                </template>
+
+                <template v-slot:item.payment_type="{ item }">
+                  <v-chip 
+                    size="small" 
+                    :color="
+                      item.payment_type === 'membership' ? 'primary' :
+                      item.payment_type === 'cbu' ? 'success' :
+                      item.payment_type === 'monthly_dues' ? 'info' :
+                      'secondary'
+                    "
+                  >
+                    {{ getPaymentTypeLabel(item.payment_type) }}
+                  </v-chip>
+                </template>
+
+                <template v-slot:item.amount="{ item }">
+                  <span class="font-weight-bold text-success">
+                    {{ formatCurrency(item.amount) }}
+                  </span>
+                </template>
+
+                <template v-slot:item.notes="{ item }">
+                  <span class="text-caption">{{ item.notes || '—' }}</span>
+                </template>
+
+                <template v-slot:no-data>
+                  <div class="text-center pa-4">
+                    <v-icon size="64" color="grey-lighten-1">mdi-receipt-text-outline</v-icon>
+                    <p class="text-h6 mt-2">No payment history</p>
+                    <p class="text-body-2 text-medium-emphasis">Payments will appear here once recorded</p>
+                  </div>
+                </template>
+              </v-data-table>
+
+              <!-- Payment Summary Footer -->
+              <v-card variant="outlined" class="mt-4" v-if="paymentHistory.length > 0">
+                <v-card-text>
+                  <div class="text-subtitle-1 font-weight-bold mb-3">Total Payments by Type:</div>
+                  <v-row>
+                    <v-col cols="6" md="3">
+                      <div class="text-caption text-medium-emphasis">Membership Fee</div>
+                      <div class="text-h6">
+                        {{ formatCurrency(paymentHistory.filter(p => p.payment_type === 'membership').reduce((sum, p) => sum + Number(p.amount), 0)) }}
+                      </div>
+                    </v-col>
+                    <v-col cols="6" md="3">
+                      <div class="text-caption text-medium-emphasis">Monthly Dues</div>
+                      <div class="text-h6">
+                        {{ formatCurrency(paymentHistory.filter(p => p.payment_type === 'monthly_dues').reduce((sum, p) => sum + Number(p.amount), 0)) }}
+                      </div>
+                    </v-col>
+                    <v-col cols="6" md="3">
+                      <div class="text-caption text-medium-emphasis">Daily Dues</div>
+                      <div class="text-h6">
+                        {{ formatCurrency(paymentHistory.filter(p => p.payment_type === 'daily_dues').reduce((sum, p) => sum + Number(p.amount), 0)) }}
+                      </div>
+                    </v-col>
+                    <v-col cols="6" md="3">
+                      <div class="text-caption text-medium-emphasis">CBU</div>
+                      <div class="text-h6">
+                        {{ formatCurrency(paymentHistory.filter(p => p.payment_type === 'cbu').reduce((sum, p) => sum + Number(p.amount), 0)) }}
+                      </div>
+                    </v-col>
+                  </v-row>
+                  <v-divider class="my-3"></v-divider>
+                  <div class="d-flex justify-space-between align-center">
+                    <span class="text-h6">Grand Total:</span>
+                    <span class="text-h5 font-weight-bold text-success">
+                      {{ formatCurrency(paymentHistory.reduce((sum, p) => sum + Number(p.amount), 0)) }}
+                    </span>
+                  </div>
+                </v-card-text>
+              </v-card>
+            </v-card-text>
+
+            <v-card-actions>
+              <v-spacer></v-spacer>
+              <v-btn 
+                color="primary" 
+                variant="elevated"
+                @click="showPaymentHistoryDialog = false"
+              >
+                Close
               </v-btn>
             </v-card-actions>
           </v-card>

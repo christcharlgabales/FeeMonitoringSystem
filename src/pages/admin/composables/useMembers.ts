@@ -17,6 +17,7 @@ export interface Payment {
   payment_date: string
   payment_type: 'membership' | 'monthly_dues' | 'daily_dues' | 'cbu'
   notes?: string
+  created_at: string // This is the timestamp when payment was recorded
 }
 
 export interface Member {
@@ -72,12 +73,42 @@ export const useMembers = () => {
         .order('name')
 
       if (error) throw error
+      
+      // Sort payments by created_at descending (most recent first)
+      if (data) {
+        data.forEach(member => {
+          if (member.payments) {
+            member.payments.sort((a: Payment, b: Payment) => 
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            )
+          }
+        })
+      }
+      
       members.value = data || []
     } catch (error: any) {
       toast.error('Failed to load members: ' + error.message)
       console.error('Error fetching members:', error)
     } finally {
       loading.value = false
+    }
+  }
+
+  // Fetch payment history for a specific member
+  const fetchPaymentHistory = async (memberId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('member_id', memberId)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      return { success: true, data: data || [] }
+    } catch (error: any) {
+      toast.error('Failed to load payment history: ' + error.message)
+      console.error('Error fetching payment history:', error)
+      return { success: false, error, data: [] }
     }
   }
 
@@ -313,12 +344,23 @@ export const useMembers = () => {
     }
   }
 
+  const getPaymentTypeLabel = (type: string): string => {
+    const labels: Record<string, string> = {
+      membership: 'Membership Fee',
+      monthly_dues: 'Monthly Dues',
+      daily_dues: 'Daily Dues',
+      cbu: 'CBU'
+    }
+    return labels[type] || type
+  }
+
   return {
     members,
     membershipTypes,
     loading,
     fetchMembershipTypes,
     fetchMembers,
+    fetchPaymentHistory,
     addMember,
     addPayment,
     updateMember,
@@ -329,6 +371,7 @@ export const useMembers = () => {
     getCBUBalance,
     getBalance,
     getPaymentStatus,
-    getCBUStatus
+    getCBUStatus,
+    getPaymentTypeLabel
   }
 }
