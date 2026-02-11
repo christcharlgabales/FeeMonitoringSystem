@@ -78,7 +78,7 @@ function navigateToAuth() {
             </p>
 
             <!-- CTA Buttons -->
-            <div class="hero-actions">
+            <!-- <div class="hero-actions">
               <v-btn
                 class="cta-button primary-btn"
                 :color="isDark ? '#F4E4BC' : 'primary'"
@@ -100,7 +100,7 @@ function navigateToAuth() {
                 <v-icon class="me-2" icon="mdi-arrow-down-circle" />
                 Learn More
               </v-btn>
-            </div>
+            </div> -->
           </div>
         </v-col>
       </v-row>
