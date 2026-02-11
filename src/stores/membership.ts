@@ -1,4 +1,3 @@
-//membership.ts
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '@/lib/supabase'
@@ -217,7 +216,7 @@ export const useMembershipStore = defineStore('membership', () => {
 
     if (paymentError) throw paymentError
 
-    // Handle CBU updates
+    // Handle CBU and column updates
     if (member?.membership_type) {
       const membershipName = member.membership_type.name
       const shouldAffectCBU = membershipName === 'Tourist VISMIN' || 
@@ -231,32 +230,48 @@ export const useMembershipStore = defineStore('membership', () => {
         willUpdateCBU: paymentType === 'cbu' || (paymentType === 'monthly_dues' && shouldAffectCBU)
       })
 
-      // ONLY update CBU if:
-      // 1. Payment type is 'cbu' (direct CBU payment), OR
-      // 2. Payment type is 'monthly_dues' AND member is Tourist VISMIN, UVE, or PUJ Members
-      if (paymentType === 'cbu' || (paymentType === 'monthly_dues' && shouldAffectCBU)) {
-        const currentCBU = member.cbu || 0
-        const newCBU = currentCBU + amount
+      // Prepare updates object
+      const memberUpdates: any = {}
+
+      // Handle monthly_dues
+      if (paymentType === 'monthly_dues') {
+        const currentMonthlyDues = member.monthly_dues || 0
+        memberUpdates.monthly_dues = currentMonthlyDues + amount
         
-        console.log('✅ Updating CBU:', {
-          currentCBU,
-          amount,
-          newCBU
-        })
+        // Also update CBU if applicable
+        if (shouldAffectCBU) {
+          const currentCBU = member.cbu || 0
+          memberUpdates.cbu = currentCBU + amount
+        }
+      }
+      // Handle daily_dues
+      else if (paymentType === 'daily_dues') {
+        const currentDailyDues = member.daily_dues || 0
+        memberUpdates.daily_dues = currentDailyDues + amount
+      }
+      // Handle direct CBU payment
+      else if (paymentType === 'cbu') {
+        const currentCBU = member.cbu || 0
+        memberUpdates.cbu = currentCBU + amount
+      }
+
+      // Apply updates if there are any
+      if (Object.keys(memberUpdates).length > 0) {
+        console.log('✅ Updating member columns:', memberUpdates)
         
         const { error: updateError } = await supabase
           .from('members')
-          .update({ cbu: newCBU })
+          .update(memberUpdates)
           .eq('id', memberId)
 
         if (updateError) {
-          console.error('❌ CBU Update Error:', updateError)
+          console.error('❌ Member Update Error:', updateError)
           throw updateError
         }
         
-        console.log('✅ CBU Updated successfully')
+        console.log('✅ Member updated successfully')
       } else {
-        console.log('⏭️ Skipping CBU update')
+        console.log('⏭️ No member column updates needed')
       }
     }
 
@@ -285,19 +300,23 @@ export const useMembershipStore = defineStore('membership', () => {
     try {
       loading.value = true
 
+      // First, fetch the original payment (without joins to avoid complexity)
       const { data: originalPayment, error: fetchError } = await supabase
         .from('payments')
-        .select('*, members!inner(membership_type_id, cbu, membership_types(*))')
+        .select('*')
         .eq('id', paymentId)
+        .eq('is_deleted', false)
         .single()
 
       if (fetchError) throw fetchError
+      if (!originalPayment) throw new Error('Payment not found')
 
       const oldAmount = originalPayment.amount
       const oldType = originalPayment.payment_type
       const newAmount = updates.amount ?? oldAmount
       const newType = updates.payment_type ?? oldType
 
+      // Update the payment
       const { data, error } = await supabase
         .from('payments')
         .update({
@@ -310,30 +329,82 @@ export const useMembershipStore = defineStore('membership', () => {
 
       if (error) throw error
 
-      const memberData = originalPayment.members
+      // Fetch member data separately to get membership type info
+      const { data: memberData, error: memberError } = await supabase
+        .from('members')
+        .select('id, cbu, monthly_dues, daily_dues, membership_types(name)')
+        .eq('id', originalPayment.member_id)
+        .single()
 
+      if (memberError) throw memberError
+
+      // Handle CBU adjustments if member has relevant membership type
       if (memberData?.membership_types) {
-        const membershipName = memberData.membership_types.name
+        // Handle both array and single object response from Supabase
+        const membershipTypeData = memberData.membership_types as any
+        const membershipName = Array.isArray(membershipTypeData) 
+          ? membershipTypeData[0]?.name 
+          : membershipTypeData?.name
+        
+        if (!membershipName) {
+          console.warn('No membership type name found')
+          toast.success('Payment updated successfully')
+          await fetchMembers()
+          return { success: true, data }
+        }
         const shouldAffectCBU = membershipName === 'Tourist VISMIN' || 
                         membershipName === 'UVE' || 
                         membershipName === 'PUJ'
-        // const shouldAffectCBU = membershipName === 'Tourist VISMIN' || membershipName === 'UVE'
 
-        let cbuAdjustment = 0
+        const memberUpdates: any = {}
 
-        if ((oldType === 'monthly_dues' && shouldAffectCBU) || oldType === 'cbu') {
-          cbuAdjustment -= oldAmount
-        }
-
-        if ((newType === 'monthly_dues' && shouldAffectCBU) || newType === 'cbu') {
-          cbuAdjustment += newAmount
-        }
-
-        if (cbuAdjustment !== 0) {
+        // Reverse old payment effects
+        if (oldType === 'monthly_dues') {
+          const currentMonthlyDues = memberData.monthly_dues || 0
+          memberUpdates.monthly_dues = currentMonthlyDues - oldAmount
+          
+          if (shouldAffectCBU) {
+            const currentCBU = memberData.cbu || 0
+            memberUpdates.cbu = (memberUpdates.cbu || currentCBU) - oldAmount
+          }
+        } else if (oldType === 'daily_dues') {
+          const currentDailyDues = memberData.daily_dues || 0
+          memberUpdates.daily_dues = currentDailyDues - oldAmount
+        } else if (oldType === 'cbu') {
           const currentCBU = memberData.cbu || 0
+          memberUpdates.cbu = (memberUpdates.cbu || currentCBU) - oldAmount
+        }
+
+        // Apply new payment effects
+        if (newType === 'monthly_dues') {
+          const currentMonthlyDues = memberUpdates.monthly_dues ?? memberData.monthly_dues ?? 0
+          memberUpdates.monthly_dues = currentMonthlyDues + newAmount
+          
+          if (shouldAffectCBU) {
+            const currentCBU = memberUpdates.cbu ?? memberData.cbu ?? 0
+            memberUpdates.cbu = currentCBU + newAmount
+          }
+        } else if (newType === 'daily_dues') {
+          const currentDailyDues = memberUpdates.daily_dues ?? memberData.daily_dues ?? 0
+          memberUpdates.daily_dues = currentDailyDues + newAmount
+        } else if (newType === 'cbu') {
+          const currentCBU = memberUpdates.cbu ?? memberData.cbu ?? 0
+          memberUpdates.cbu = currentCBU + newAmount
+        }
+
+        // Apply updates if there are any
+        if (Object.keys(memberUpdates).length > 0) {
+          console.log('💰 Member Column Adjustments on Edit:', {
+            oldType,
+            oldAmount,
+            newType,
+            newAmount,
+            updates: memberUpdates
+          })
+          
           const { error: updateError } = await supabase
             .from('members')
-            .update({ cbu: currentCBU + cbuAdjustment })
+            .update(memberUpdates)
             .eq('id', originalPayment.member_id)
 
           if (updateError) throw updateError
@@ -384,7 +455,7 @@ export const useMembershipStore = defineStore('membership', () => {
 
       const { data: payment, error: fetchError } = await supabase
         .from('payments')
-        .select('*, members!inner(membership_type_id, cbu, membership_types(*))')
+        .select('*, members!inner(membership_type_id, cbu, monthly_dues, daily_dues, membership_types(*))')
         .eq('id', paymentId)
         .single()
 
@@ -407,13 +478,31 @@ export const useMembershipStore = defineStore('membership', () => {
         const shouldAffectCBU = membershipName === 'Tourist VISMIN' || 
                         membershipName === 'UVE' || 
                         membershipName === 'PUJ'
-        // const shouldAffectCBU = membershipName === 'Tourist VISMIN' || membershipName === 'UVE'
 
-        if ((payment.payment_type === 'monthly_dues' && shouldAffectCBU) || payment.payment_type === 'cbu') {
+        const memberUpdates: any = {}
+
+        // Handle reversal based on payment type
+        if (payment.payment_type === 'monthly_dues') {
+          const currentMonthlyDues = memberData.monthly_dues || 0
+          memberUpdates.monthly_dues = Math.max(0, currentMonthlyDues - payment.amount)
+          
+          if (shouldAffectCBU) {
+            const currentCBU = memberData.cbu || 0
+            memberUpdates.cbu = Math.max(0, currentCBU - payment.amount)
+          }
+        } else if (payment.payment_type === 'daily_dues') {
+          const currentDailyDues = memberData.daily_dues || 0
+          memberUpdates.daily_dues = Math.max(0, currentDailyDues - payment.amount)
+        } else if (payment.payment_type === 'cbu') {
           const currentCBU = memberData.cbu || 0
+          memberUpdates.cbu = Math.max(0, currentCBU - payment.amount)
+        }
+
+        // Apply updates if there are any
+        if (Object.keys(memberUpdates).length > 0) {
           const { error: updateError } = await supabase
             .from('members')
-            .update({ cbu: Math.max(0, currentCBU - payment.amount) })
+            .update(memberUpdates)
             .eq('id', payment.member_id)
 
           if (updateError) throw updateError
