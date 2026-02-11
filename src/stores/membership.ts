@@ -369,7 +369,10 @@ export const useMembershipStore = defineStore('membership', () => {
 
       if (memberData?.membership_types) {
         const membershipName = memberData.membership_types.name
-        const shouldAffectCBU = membershipName === 'Tourist VISMIN' || membershipName === 'UVE'
+        const shouldAffectCBU = membershipName === 'Tourist VISMIN' || 
+                        membershipName === 'UVE' || 
+                        membershipName === 'PUJ Members'
+        // const shouldAffectCBU = membershipName === 'Tourist VISMIN' || membershipName === 'UVE'
 
         if ((payment.payment_type === 'monthly_dues' && shouldAffectCBU) || payment.payment_type === 'cbu') {
           const currentCBU = memberData.cbu || 0
