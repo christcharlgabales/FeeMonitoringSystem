@@ -1,3 +1,4 @@
+//EditPaymentDialog.vue
 <script setup lang="ts">
 import { computed } from 'vue'
 import { paymentTypeOptions } from '@/utils/membershipHelpers'
