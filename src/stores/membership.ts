@@ -1,3 +1,4 @@
+//membership.ts
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '@/lib/supabase'
@@ -205,7 +206,10 @@ export const useMembershipStore = defineStore('membership', () => {
     // Handle CBU updates
     if (member?.membership_type) {
       const membershipName = member.membership_type.name
-      const shouldAffectCBU = membershipName === 'Tourist VISMIN' || membershipName === 'UVE'
+      // const shouldAffectCBU = membershipName === 'Tourist VISMIN' || membershipName === 'UVE'
+      const shouldAffectCBU = membershipName === 'Tourist VISMIN' || 
+                        membershipName === 'UVE' || 
+                        membershipName === 'PUJ Members'
 
       // ONLY update CBU if:
       // 1. Payment type is 'cbu' (direct CBU payment), OR

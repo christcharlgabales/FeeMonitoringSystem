@@ -7,7 +7,6 @@ import { useMembershipStore } from '@/stores/membership'
 import { useMembershipDialogs } from '@/pages/admin/composables/useMembershipDialogs'
 import { getBalance, formatCurrency } from '@/utils/membershipHelpers'
 
-// Components
 import MembershipTypeCard from '@/pages/admin/components/membership/MembershipTypeCard.vue'
 import MemberDetailsTable from '@/pages/admin/components/membership/MemberDetailsTable.vue'
 import AddMemberDialog from '@/pages/admin/components/membership/dialogs/AddMemberDialog.vue'

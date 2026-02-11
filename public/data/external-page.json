@@ -3,7 +3,7 @@
   "description": "A comprehensive solution for monitoring and managing fees across departments, ensuring accurate and timely fee collection and tracking.",
   "subtitle": "Streamlining Fee Collection and Monitoring Across Teams",
   "backgroundImage": {
-    "src": "/images/monitoring-bg.png",
+    "src": "/src/assets/carblogo.png",
     "alt": "Professional background with graphs and financial data",
     "overlay": {
       "enabled": true,
@@ -51,7 +51,7 @@
       "title": "Monitoring Fee System",
       "icon": "mdi-account-cash",
       "logo": {
-        "src": "/src/assets/carbulogo.svg",
+        "src": "/src/assets/carblogo.svg",
         "alt": "Monitoring Fee Logo",
         "width": 32,
         "height": 32
