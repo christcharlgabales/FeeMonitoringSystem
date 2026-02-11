@@ -78,6 +78,7 @@ const show = computed({
               size="small"
               :color="
                 item.payment_type === 'membership' ? 'primary' :
+                item.payment_type === 'daily_dues' ? 'info' :
                 item.payment_type === 'cbu' ? 'success' :
                 item.payment_type === 'monthly_dues' ? 'info' :
                 'secondary'
