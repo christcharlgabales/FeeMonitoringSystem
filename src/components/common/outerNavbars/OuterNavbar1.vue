@@ -265,7 +265,7 @@
     <!-- Desktop Navigation -->
     <template #append>
       <!-- Navigation Items - Hidden on Mobile -->
-      <template v-if="!mobile">
+      <!-- <template v-if="!mobile">
         <v-btn
           v-for="item in navbarConfig.navigationItems"
           :key="item.label"
@@ -275,7 +275,7 @@
         >
           {{ item.label }}
         </v-btn>
-      </template>
+      </template> -->
 
       <!-- Theme Toggle Button -->
       <v-btn
