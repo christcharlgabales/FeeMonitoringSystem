@@ -74,38 +74,44 @@ export const useMembershipStore = defineStore('membership', () => {
   }
 
   async function fetchMembers() {
-    try {
-      loading.value = true
-      const { data, error } = await supabase
-        .from('members')
-        .select(`
-          *,
-          membership_type:membership_types(*),
-          payments!inner(*)
-        `)
-        .eq('payments.is_deleted', false)
-        .order('name')
+  try {
+    loading.value = true
+    
+    const { data, error } = await supabase
+      .from('members')
+      .select(`
+        *,
+        membership_type:membership_types(*),
+        payments(*)
+      `)
+      .order('name')
 
-      if (error) throw error
+    if (error) throw error
 
-      if (data) {
-        data.forEach(member => {
-          if (member.payments) {
-            member.payments.sort((a: Payment, b: Payment) =>
+    if (data) {
+      // Filter out deleted payments and sort
+      data.forEach(member => {
+        console.log(`Member ${member.name} CBU from DB:`, member.cbu)
+        
+        if (member.payments) {
+          member.payments = member.payments
+            .filter((p: Payment) => !p.is_deleted)
+            .sort((a: Payment, b: Payment) =>
               new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
             )
-          }
-        })
-      }
-
-      members.value = data || []
-    } catch (error: any) {
-      toast.error('Failed to load members: ' + error.message)
-      console.error('Error fetching members:', error)
-    } finally {
-      loading.value = false
+        }
+      })
     }
+
+    members.value = data || []
+    console.log('📊 Members updated:', members.value.length)
+  } catch (error: any) {
+    toast.error('Failed to load members: ' + error.message)
+    console.error('Error fetching members:', error)
+  } finally {
+    loading.value = false
   }
+}
 
   async function fetchPaymentHistory(memberId: string) {
     try {
@@ -188,6 +194,14 @@ export const useMembershipStore = defineStore('membership', () => {
     loading.value = true
 
     const member = members.value.find(m => m.id === memberId)
+    
+    console.log('🔍 Payment Details:', {
+      memberId,
+      amount,
+      paymentType,
+      membershipName: member?.membership_type?.name,
+      currentCBU: member?.cbu
+    })
 
     // Insert payment
     const { data: payment, error: paymentError } = await supabase
@@ -206,22 +220,43 @@ export const useMembershipStore = defineStore('membership', () => {
     // Handle CBU updates
     if (member?.membership_type) {
       const membershipName = member.membership_type.name
-      // const shouldAffectCBU = membershipName === 'Tourist VISMIN' || membershipName === 'UVE'
       const shouldAffectCBU = membershipName === 'Tourist VISMIN' || 
-                        membershipName === 'UVE' || 
-                        membershipName === 'PUJ Members'
+                              membershipName === 'UVE' || 
+                              membershipName === 'PUJ'
+      
+      console.log('💰 CBU Check:', {
+        membershipName,
+        shouldAffectCBU,
+        paymentType,
+        willUpdateCBU: paymentType === 'cbu' || (paymentType === 'monthly_dues' && shouldAffectCBU)
+      })
 
       // ONLY update CBU if:
       // 1. Payment type is 'cbu' (direct CBU payment), OR
-      // 2. Payment type is 'monthly_dues' AND member is Tourist VISMIN or UVE
+      // 2. Payment type is 'monthly_dues' AND member is Tourist VISMIN, UVE, or PUJ Members
       if (paymentType === 'cbu' || (paymentType === 'monthly_dues' && shouldAffectCBU)) {
         const currentCBU = member.cbu || 0
+        const newCBU = currentCBU + amount
+        
+        console.log('✅ Updating CBU:', {
+          currentCBU,
+          amount,
+          newCBU
+        })
+        
         const { error: updateError } = await supabase
           .from('members')
-          .update({ cbu: currentCBU + amount })
+          .update({ cbu: newCBU })
           .eq('id', memberId)
 
-        if (updateError) throw updateError
+        if (updateError) {
+          console.error('❌ CBU Update Error:', updateError)
+          throw updateError
+        }
+        
+        console.log('✅ CBU Updated successfully')
+      } else {
+        console.log('⏭️ Skipping CBU update')
       }
     }
 
@@ -281,7 +316,7 @@ export const useMembershipStore = defineStore('membership', () => {
         const membershipName = memberData.membership_types.name
         const shouldAffectCBU = membershipName === 'Tourist VISMIN' || 
                         membershipName === 'UVE' || 
-                        membershipName === 'PUJ Members'
+                        membershipName === 'PUJ'
         // const shouldAffectCBU = membershipName === 'Tourist VISMIN' || membershipName === 'UVE'
 
         let cbuAdjustment = 0
@@ -371,7 +406,7 @@ export const useMembershipStore = defineStore('membership', () => {
         const membershipName = memberData.membership_types.name
         const shouldAffectCBU = membershipName === 'Tourist VISMIN' || 
                         membershipName === 'UVE' || 
-                        membershipName === 'PUJ Members'
+                        membershipName === 'PUJ'
         // const shouldAffectCBU = membershipName === 'Tourist VISMIN' || membershipName === 'UVE'
 
         if ((payment.payment_type === 'monthly_dues' && shouldAffectCBU) || payment.payment_type === 'cbu') {
