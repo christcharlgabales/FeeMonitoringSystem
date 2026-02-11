@@ -1,3 +1,4 @@
+//Home.vue
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
@@ -51,9 +52,8 @@ const showCBUNote = computed(() => {
   if (!selectedMember.value?.membership_type) return false
   const membershipName = selectedMember.value.membership_type.name
   return paymentForm.value.type === 'monthly_dues' &&
-    (membershipName === 'Tourist VISMIN' || membershipName === 'UVE')
+    (membershipName === 'Tourist VISMIN' || membershipName === 'UVE' || membershipName === 'PUJ')
 })
-
 // Methods
 const handleAddMember = async () => {
   if (!newMemberForm.value.name || !selectedMembershipType.value) {
