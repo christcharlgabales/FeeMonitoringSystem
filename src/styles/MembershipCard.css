@@ -1,0 +1,317 @@
+/* Membership Card Styles - Glassmorphism Design */
+
+.membership-card {
+  position: relative;
+  border-radius: 20px;
+  padding: 2px;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  min-height: 280px;
+}
+
+/* Gradient border effect */
+.membership-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  padding: 2px;
+  background: linear-gradient(135deg, var(--card-color), transparent, var(--card-color));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.6;
+  transition: opacity 0.4s ease;
+}
+
+.membership-card:hover::before {
+  opacity: 1;
+}
+
+/* Card background with glassmorphism */
+.card-background {
+  position: absolute;
+  inset: 2px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.4s ease;
+}
+
+/* Light mode adjustments */
+@media (prefers-color-scheme: light) {
+  .card-background {
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+  }
+}
+
+/* Vue's light mode class support */
+.v-theme--light .card-background {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.v-theme--dark .card-background {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.membership-card:hover .card-background {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-2px);
+}
+
+.v-theme--light .membership-card:hover .card-background {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+/* Card content */
+.card-content {
+  position: relative;
+  padding: 24px;
+  z-index: 1;
+}
+
+/* Header */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
+.title-wrapper {
+  flex: 1;
+  min-width: 0; /* Allow text to shrink */
+}
+
+.card-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--card-color);
+  transition: transform 0.3s ease;
+  word-wrap: break-word;
+  line-height: 1.3;
+}
+
+.membership-card:hover .card-title {
+  transform: translateX(4px);
+}
+
+.card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--card-color), rgba(var(--card-color), 0.6));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  transition: all 0.4s ease;
+}
+
+.membership-card:hover .card-icon {
+  transform: rotate(10deg) scale(1.1);
+  box-shadow: 0 8px 24px rgba(var(--card-color), 0.4);
+}
+
+/* Price section */
+.card-price {
+  margin: 20px 0;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.currency-symbol {
+  font-size: 1.5rem;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.amount {
+  font-size: 2.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+/* Details section */
+.card-details {
+  margin: 24px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detail-row {
+  display: flex;
+  gap: 12px;
+}
+
+.detail-item {
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+}
+
+.v-theme--light .detail-item {
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.detail-item.full-width {
+  width: 100%;
+}
+
+.membership-card:hover .detail-item {
+  background: rgba(255, 255, 255, 0.05);
+  transform: translateX(4px);
+}
+
+.v-theme--light .membership-card:hover .detail-item {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.detail-icon {
+  color: var(--card-color);
+  opacity: 0.8;
+}
+
+.detail-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+  font-weight: 600;
+}
+
+.detail-value {
+  margin-left: auto;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+/* Footer */
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.v-theme--light .card-footer {
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.view-details {
+  font-size: 0.875rem;
+  font-weight: 600;
+  opacity: 0.8;
+  transition: all 0.3s ease;
+}
+
+.membership-card:hover .view-details {
+  opacity: 1;
+  color: var(--card-color);
+}
+
+.arrow-icon {
+  transition: transform 0.3s ease;
+  opacity: 0.6;
+}
+
+.membership-card:hover .arrow-icon {
+  transform: translateX(4px);
+  opacity: 1;
+  color: var(--card-color);
+}
+
+/* Shine effect on hover */
+.shine-effect {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent,
+    rgba(255, 255, 255, 0.03),
+    transparent
+  );
+  transform: translateX(-100%) translateY(-100%) rotate(45deg);
+  transition: transform 0.6s ease;
+}
+
+.membership-card:hover .shine-effect {
+  transform: translateX(100%) translateY(100%) rotate(45deg);
+}
+
+/* Hover effects */
+.membership-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 
+    0 20px 40px rgba(0, 0, 0, 0.15),
+    0 0 40px rgba(var(--card-color), 0.2);
+}
+
+/* Active/Click effect */
+.membership-card:active {
+  transform: translateY(-4px) scale(0.98);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .card-content {
+    padding: 20px;
+  }
+
+  .card-title {
+    font-size: 1.25rem;
+  }
+
+  .amount {
+    font-size: 1.875rem;
+  }
+
+  .card-icon {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* Animation for card entrance */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.membership-card {
+  animation: slideInUp 0.5s ease-out;
+}
+
+/* Accessibility - Focus state */
+.membership-card:focus-visible {
+  outline: 3px solid var(--card-color);
+  outline-offset: 4px;
+}

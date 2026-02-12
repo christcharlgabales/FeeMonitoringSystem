@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { MembershipType } from '@/stores/membership'
 import { formatCurrency } from '@/utils/membershipHelpers'
+import '../../../../styles/MembershipCard.css'
 
 interface Props {
   membershipType: MembershipType
@@ -15,31 +16,49 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <v-card
-    :color="membershipType.color"
-    dark
-    hover
+  <div 
+    class="membership-card"
+    :style="{ '--card-color': membershipType.color }"
     @click="emit('click', membershipType)"
-    class="cursor-pointer"
   >
-    <v-card-title class="text-h5">{{ membershipType.name }}</v-card-title>
-    <v-card-subtitle class="text-h6 mt-2">
-      {{ formatCurrency(membershipType.fee) }}
-    </v-card-subtitle>
-    <v-card-text>
-      <div class="d-flex align-center justify-space-between mb-2">
-        <span>Members: {{ memberCount }}</span>
-        <v-icon>mdi-arrow-right</v-icon>
+    <div class="card-background"></div>
+    <div class="card-content">
+      <div class="card-header">
+        <h3 class="card-title">{{ membershipType.name }}</h3>
+        <div class="card-icon">
+          <v-icon>mdi-card-account-details</v-icon>
+        </div>
       </div>
-      <div class="text-caption">
-        CBU Target: {{ formatCurrency(membershipType.cbu_target) }}
-      </div>
-    </v-card-text>
-  </v-card>
-</template>
 
-<style scoped>
-.cursor-pointer {
-  cursor: pointer;
-}
-</style>
+      <div class="card-price">
+        <span class="currency-symbol">₱</span>
+        <span class="amount">{{ formatCurrency(membershipType.fee).replace('₱', '') }}</span>
+      </div>
+
+      <div class="card-details">
+        <div class="detail-row">
+          <div class="detail-item">
+            <v-icon size="small" class="detail-icon">mdi-account-group</v-icon>
+            <span class="detail-label">Members</span>
+            <span class="detail-value">{{ memberCount }}</span>
+          </div>
+        </div>
+
+        <div class="detail-row">
+          <div class="detail-item full-width">
+            <v-icon size="small" class="detail-icon">mdi-target</v-icon>
+            <span class="detail-label">CBU Target</span>
+            <span class="detail-value">{{ formatCurrency(membershipType.cbu_target) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <span class="view-details">View Details</span>
+        <v-icon class="arrow-icon">mdi-arrow-right</v-icon>
+      </div>
+
+      <div class="shine-effect"></div>
+    </div>
+  </div>
+</template>
