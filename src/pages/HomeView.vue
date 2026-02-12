@@ -212,7 +212,13 @@ onMounted(async () => {
           <v-card>
             <v-card-title class="d-flex justify-space-between align-center">
               <span class="text-h5">{{ selectedMembershipType?.name }} Members</span>
-              <div>
+              
+              <!-- Search Bar (aligned with title) -->
+              <div style="flex: 1; max-width: 400px; margin: 0 16px;">
+                <SearchBar v-model="searchQuery" />
+              </div>
+
+              <div class="d-flex align-center">
                 <v-btn
                   color="primary"
                   @click="openAddMemberDialog"
@@ -230,15 +236,6 @@ onMounted(async () => {
             </v-card-title>
 
             <v-divider></v-divider>
-
-            <!-- Search Bar -->
-            <v-card-text class="pb-0">
-              <v-row>
-                <v-col cols="12" md="6" class="mx-auto">
-                  <SearchBar v-model="searchQuery" />
-                </v-col>
-              </v-row>
-            </v-card-text>
 
             <v-card-text style="max-height: 600px;">
               <!-- No Results Message -->
