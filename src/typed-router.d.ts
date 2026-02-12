@@ -31,6 +31,7 @@ declare module 'vue-router/auto-routes' {
     '/admin/components/membership/MemberDetailsTable': RouteRecordInfo<'/admin/components/membership/MemberDetailsTable', '/admin/components/membership/MemberDetailsTable', Record<never, never>, Record<never, never>>,
     '/admin/components/membership/MembershipTypeCard': RouteRecordInfo<'/admin/components/membership/MembershipTypeCard', '/admin/components/membership/MembershipTypeCard', Record<never, never>, Record<never, never>>,
     '/admin/components/membership/payment/PaymentSummaryCard': RouteRecordInfo<'/admin/components/membership/payment/PaymentSummaryCard', '/admin/components/membership/payment/PaymentSummaryCard', Record<never, never>, Record<never, never>>,
+    '/admin/components/SearchBar': RouteRecordInfo<'/admin/components/SearchBar', '/admin/components/SearchBar', Record<never, never>, Record<never, never>>,
     '/admin/components/UserManagementTable': RouteRecordInfo<'/admin/components/UserManagementTable', '/admin/components/UserManagementTable', Record<never, never>, Record<never, never>>,
     '/admin/dialogs/AdminUserRolesDialog': RouteRecordInfo<'/admin/dialogs/AdminUserRolesDialog', '/admin/dialogs/AdminUserRolesDialog', Record<never, never>, Record<never, never>>,
     '/admin/UserManagementView': RouteRecordInfo<'/admin/UserManagementView', '/admin/UserManagementView', Record<never, never>, Record<never, never>>,

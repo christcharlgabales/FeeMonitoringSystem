@@ -1,6 +1,5 @@
-//Home.vue
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useToast } from 'vue-toastification'
 import InnerLayoutWrapper from '@/layouts/InnerLayoutWrapper.vue'
@@ -15,6 +14,7 @@ import AddPaymentDialog from '@/pages/admin/components/membership/dialogs/AddPay
 import PaymentHistoryDialog from '@/pages/admin/components/membership/dialogs/PaymentHistoryDialog.vue'
 import EditPaymentDialog from '@/pages/admin/components/membership/dialogs/EditPaymentDialog.vue'
 import DeletePaymentDialog from '@/pages/admin/components/membership/dialogs/DeletePaymentDialog.vue'
+import SearchBar from '@/pages/admin/components/SearchBar.vue'
 
 const toast = useToast()
 const membershipStore = useMembershipStore()
@@ -42,10 +42,24 @@ const {
 
 const { members, membershipTypes, loading } = storeToRefs(membershipStore)
 
+// Search functionality
+const searchQuery = ref('')
+
 // Computed
 const filteredMembers = computed(() => {
   if (!selectedMembershipType.value) return []
-  return membershipStore.getMembersByType(selectedMembershipType.value.id)
+  
+  let membersList = membershipStore.getMembersByType(selectedMembershipType.value.id)
+  
+  // Apply search filter
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.toLowerCase().trim()
+    membersList = membersList.filter(member => 
+      member.name.toLowerCase().includes(query)
+    )
+  }
+  
+  return membersList
 })
 
 const showCBUNote = computed(() => {
@@ -54,7 +68,13 @@ const showCBUNote = computed(() => {
   return paymentForm.value.type === 'monthly_dues' &&
     (membershipName === 'Tourist VISMIN' || membershipName === 'UVE' || membershipName === 'PUJ')
 })
+
 // Methods
+const handleOpenMemberDetailsDialog = (type: any) => {
+  searchQuery.value = '' // Reset search when opening dialog
+  openMemberDetailsDialog(type)
+}
+
 const handleAddMember = async () => {
   if (!newMemberForm.value.name || !selectedMembershipType.value) {
     toast.error('Please fill in the member name')
@@ -182,7 +202,7 @@ onMounted(async () => {
             <MembershipTypeCard
               :membership-type="type"
               :member-count="membershipStore.getMemberCount(type.id)"
-              @click="openMemberDetailsDialog(type)"
+              @click="handleOpenMemberDetailsDialog(type)"
             />
           </v-col>
         </v-row>
@@ -211,7 +231,26 @@ onMounted(async () => {
 
             <v-divider></v-divider>
 
+            <!-- Search Bar -->
+            <v-card-text class="pb-0">
+              <v-row>
+                <v-col cols="12" md="6" class="mx-auto">
+                  <SearchBar v-model="searchQuery" />
+                </v-col>
+              </v-row>
+            </v-card-text>
+
             <v-card-text style="max-height: 600px;">
+              <!-- No Results Message -->
+              <v-alert
+                v-if="filteredMembers.length === 0 && searchQuery"
+                type="info"
+                variant="tonal"
+                class="mb-4"
+              >
+                No members found matching "{{ searchQuery }}"
+              </v-alert>
+
               <MemberDetailsTable
                 :members="filteredMembers"
                 :loading="loading"
